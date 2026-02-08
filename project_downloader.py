@@ -8,9 +8,6 @@ except ValueError:
 if cooldown > 0:
     launch_confirmation = int(input("Now input the first project ID you want to download: "))
 
-    import urllib.request
-    import time
-
     from datetime import datetime
     current_date = datetime.today().strftime('%Y-%m-%d %H:%M:%S.%f')
 
@@ -19,10 +16,8 @@ if cooldown > 0:
     logging.basicConfig(
         format = '%(asctime)s - %(name)s (%(levelname)s): %(message)s',
         level = logging.INFO,
-        handlers = [
-            logging.FileHandler(f"archive_log.log"),
-            logging.StreamHandler(sys.stdout)
-        ])
+        handlers = [logging.FileHandler(f"archive_log.log"), logging.StreamHandler(sys.stdout)]
+    )
     logger = logging.getLogger(__name__)
 
     import os, shutil
@@ -32,25 +27,37 @@ if cooldown > 0:
     except FileExistsError:
         pass
 
-    def download_project(file, name, type):
+    def copy_file_to_disk(original, name, version):
         with open(name, "wb") as downloaded_file:
-            downloaded_file.write(file.read())
-            logger.info(f"{type} download: {name}")
+            downloaded_file.write(original.read())
+            logger.info(f"{version} download: {name}")
 
-    if launch_confirmation > 0:
-        for project_id in range(launch_confirmation, 1276652897):
-            download_file_name = f"{project_directory}/{project_id}"
+    import concurrent.futures
+    import urllib.request
 
+    def download_project(project_id, name):
+        try:
+            with urllib.request.urlopen(f'https://scratch-projects-v3.scratch.org/{project_id}') as project_file:
+                copy_file_to_disk(project_file, name, "v3")
+
+        except urllib.error.HTTPError:
             try:
-                with urllib.request.urlopen(f'https://scratch-projects-v3.scratch.org/{project_id}') as original_project_file:
-                    download_project(original_project_file, download_file_name, "v3")
+                with urllib.request.urlopen(f'https://scratch-projects-v2.scratch.org/{project_id}') as project_file:
+                    copy_file_to_disk(project_file, name, "v2")
 
             except urllib.error.HTTPError:
-                try:
-                    with urllib.request.urlopen(f'https://scratch-projects-v2.scratch.org/{project_id}') as original_project_file:
-                        download_project(original_project_file, download_file_name, "v2")
+                logger.info(f"FAILED to download {project_id}!")
 
-                except urllib.error.HTTPError:
-                    logger.info(f"FAILED to download {project_id}!")
+    import time
 
-            time.sleep(cooldown)
+    try:
+        if launch_confirmation > 0:
+            with concurrent.futures.ThreadPoolExecutor(max_workers = 8) as executor:
+                for project_id in range(launch_confirmation, 1276652900):
+                    download_file_name = f"{project_directory}/{project_id}"
+                    executor.submit(download_project, project_id, download_file_name)
+
+                    time.sleep(cooldown)
+
+    except KeyboardInterrupt:
+        logger.info("Manually stopped (KeyboardInterrupt)")
