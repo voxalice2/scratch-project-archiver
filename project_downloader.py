@@ -46,7 +46,12 @@ if cooldown > 0:
                     copy_file_to_disk(project_file, name, "v2")
 
             except urllib.error.HTTPError:
-                logger.info(f"FAILED to download {project_id}!")
+                try:
+                    with urllib.request.urlopen(f'https://scratch-projects.scratch.org/{project_id}') as project_file:
+                        copy_file_to_disk(project_file, name, "scratch-projects")
+
+                except urllib.error.HTTPError:
+                    logger.info(f"FAILED to download {project_id}!")
 
     import time
 
